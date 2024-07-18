@@ -22,7 +22,7 @@ class WeatherBloc extends Bloc<WeatherEvent, WeatherState> {
 
     try {
       final response = await http.get(Uri.parse(
-          'https://api.openweathermap.org/data/2.5/weather?q=${event.city}&APPID=${UrlConst.APIKey}'));
+          'https://api.openweathermap.org/data/2.5/weather?q=${event.city}&APPID=${UrlConst.apiKey}'));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

@@ -1,13 +1,14 @@
-import 'package:demobloc/utils/shimmer_utils.dart';
+import 'package:demobloc/bloc/weather_event.dart';
+import 'package:demobloc/bloc/weather_state.dart';
 import 'package:demobloc/utils/dialoge_utils.dart';
+import 'package:demobloc/utils/shimmer_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:location/location.dart' as loc;
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../bloc/weather_bloc.dart';
-import '../bloc/weather_event.dart';
-import '../bloc/weather_state.dart';
 import '../repo/weather_repo.dart';
 import '../model/model.dart';
 
@@ -23,13 +24,13 @@ class _WeatherPageState extends State<WeatherPage> {
   WeatherData? currentLocationWeather;
   bool hasLocationPermission = false;
   final formKey = GlobalKey<FormState>();
-  List<String> cityList = []; // List to store city names from Firestore
+  List<String> cityList = [];
 
   @override
   void initState() {
     super.initState();
     checkLocationPermission();
-    fetchCityList(); // Fetch initial city list
+    fetchCityList();
   }
 
   Future<void> checkLocationPermission() async {
@@ -84,7 +85,7 @@ class _WeatherPageState extends State<WeatherPage> {
 
   Future<void> fetchCityList() async {
     QuerySnapshot citySnapshot =
-        await FirebaseFirestore.instance.collection('weatherData').get();
+    await FirebaseFirestore.instance.collection('weatherData').get();
     setState(() {
       cityList =
           citySnapshot.docs.map((doc) => doc['cityName'] as String).toList();
@@ -127,16 +128,20 @@ class _WeatherPageState extends State<WeatherPage> {
         cityController: _cityController,
         currentLocationWeather: currentLocationWeather,
         cityList: cityList,
+        onWeatherFetched: () {
+          fetchCityList(); // Refresh city list on weather fetch
+        },
       ),
     );
   }
 }
 
-class WeatherPageContent extends StatelessWidget {
+class WeatherPageContent extends StatefulWidget {
   final GlobalKey<FormState> formKey;
   final TextEditingController cityController;
   final WeatherData? currentLocationWeather;
   final List<String> cityList;
+  final VoidCallback onWeatherFetched;
 
   const WeatherPageContent({
     Key? key,
@@ -144,8 +149,14 @@ class WeatherPageContent extends StatelessWidget {
     required this.cityController,
     required this.currentLocationWeather,
     required this.cityList,
+    required this.onWeatherFetched,
   }) : super(key: key);
 
+  @override
+  _WeatherPageContentState createState() => _WeatherPageContentState();
+}
+
+class _WeatherPageContentState extends State<WeatherPageContent> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,7 +170,7 @@ class WeatherPageContent extends StatelessWidget {
             onPressed: () {
               showSearch(
                 context: context,
-                delegate: CitySearchDelegate(cityList),
+                delegate: CitySearchDelegate(),
               );
             },
           ),
@@ -170,50 +181,50 @@ class WeatherPageContent extends StatelessWidget {
           builder: (context, state) {
             if (state is WeatherInitial || state is WeatherLoaded) {
               return Form(
-                key: formKey,
+                key: widget.formKey,
                 child: Column(
                   children: [
                     const SizedBox(height: 15,),
-                    currentLocationWeather != null
+                    widget.currentLocationWeather != null
                         ? Card(
-                            child: Container(
-                              margin: const EdgeInsets.only(
-                                  left: 50, right: 50, top: 5, bottom: 5),
-                              child: Column(
-                                children: [
-                                  Text(
-                                    "Current Weather in ${currentLocationWeather!.cityName ?? ""}",
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Temperature: ${currentLocationWeather!.temperature}°C',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Humidity: ${currentLocationWeather!.humidity}%',
-                                    style: const TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w400,
-                                    ),
-                                  ),
-                                ],
+                      child: Container(
+                        margin: const EdgeInsets.only(
+                            left: 50, right: 50, top: 5, bottom: 5),
+                        child: Column(
+                          children: [
+                            Text(
+                              "Current Weather in ${widget.currentLocationWeather!.cityName ?? ""}",
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
-                          )
+                            Text(
+                              'Temperature: ${widget.currentLocationWeather!.temperature}°C',
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            Text(
+                              'Humidity: ${widget.currentLocationWeather!.humidity}%',
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                         : const currentWeather_shimmer(),
                     Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: TextFormField(
-                        controller: cityController,
+                        controller: widget.cityController,
                         decoration: const InputDecoration(
                           labelText: 'Enter city name',
                           border: OutlineInputBorder(),
@@ -228,12 +239,12 @@ class WeatherPageContent extends StatelessWidget {
                     ),
                     ElevatedButton(
                       onPressed: () {
-                        if (formKey.currentState!.validate()) {
-                          // Only fetch weather if the form is valid
+                        if (widget.formKey.currentState!.validate()) {
                           context.read<WeatherBloc>().add(
-                                WeatherFetchEvent(cityController.text.trim()),
-                              );
-                          cityController.clear();
+                            WeatherFetchEvent(widget.cityController.text.trim()),
+                          );
+                          widget.cityController.clear();
+                          widget.onWeatherFetched(); // Notify to refresh city list
                         }
                       },
                       child: const Text('Fetch Weather'),
@@ -291,7 +302,6 @@ class WeatherPageContent extends StatelessWidget {
             } else if (state is WeatherLoading) {
               return const CircularProgressIndicator();
             } else if (state is WeatherError) {
-              // Show dialog for error state
               return AlertDialog(
                 title: const Text('Error'),
                 content: Text(state.message),
@@ -300,7 +310,7 @@ class WeatherPageContent extends StatelessWidget {
                     onPressed: () {
                       Navigator.of(context).pushReplacement(MaterialPageRoute(
                         builder: (context) => const WeatherPage(),
-                      )); // Close dialog
+                      ));
                     },
                     child: const Text('OK'),
                   ),
@@ -316,14 +326,51 @@ class WeatherPageContent extends StatelessWidget {
   }
 }
 
-class CitySearchDelegate extends SearchDelegate<String> {
-  final List<String> cityList;
 
-  CitySearchDelegate(this.cityList);
+
+class CitySearchDelegate extends SearchDelegate<String> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore.collection('weatherData').snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return const Center(child: Text('Error fetching data'));
+        }
+
+        final List<String> cityList = snapshot.data!.docs
+            .map((DocumentSnapshot document) => document['cityName'] as String)
+            .toList();
+
+        final List<String> filteredCities = query.isEmpty
+            ? cityList
+            : cityList
+            .where((city) => city.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+
+        return ListView.builder(
+          itemCount: filteredCities.length,
+          itemBuilder: (context, index) {
+            final String city = filteredCities[index];
+            return ListTile(
+              title: Text(city),
+              onTap: () {
+                close(context, city);
+              },
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   List<Widget> buildActions(BuildContext context) {
-    // Actions for search bar (e.g., clear query button)
     return [
       IconButton(
         icon: const Icon(Icons.clear),
@@ -336,7 +383,6 @@ class CitySearchDelegate extends SearchDelegate<String> {
 
   @override
   Widget buildLeading(BuildContext context) {
-    // Leading icon on the left of the search bar
     return IconButton(
       icon: const Icon(Icons.arrow_back),
       onPressed: () {
@@ -347,43 +393,12 @@ class CitySearchDelegate extends SearchDelegate<String> {
 
   @override
   Widget buildResults(BuildContext context) {
-    // Show search results based on query
-    final List<String> filteredCities = cityList.where((city) {
-      return city.toLowerCase().contains(query.toLowerCase());
-    }).toList();
-
-    return ListView.builder(
-      itemCount: filteredCities.length,
-      itemBuilder: (context, index) {
-        final String city = filteredCities[index];
-        return ListTile(
-          title: Text(city),
-          onTap: () {
-            close(context, city);
-          },
-        );
-      },
-    );
+    return Container(); // Not used, as results are shown in build method
   }
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    // Suggestions based on query
-    final List<String> filteredCities = cityList.where((city) {
-      return city.toLowerCase().contains(query.toLowerCase());
-    }).toList();
-
-    return ListView.builder(
-      itemCount: filteredCities.length,
-      itemBuilder: (context, index) {
-        final String city = filteredCities[index];
-        return ListTile(
-          title: Text(city),
-          onTap: () {
-            close(context, city);
-          },
-        );
-      },
-    );
+    return build(context);
   }
 }
+

@@ -10,7 +10,7 @@ class WeatherRepository {
     var client = http.Client();
     try {
       var response = await client.get(Uri.parse(
-          'https://api.openweathermap.org/data/2.5/weather?q=$city&APPID=${UrlConst.APIKey}'));
+          'https://api.openweathermap.org/data/2.5/weather?q=$city&APPID=${UrlConst.apiKey}'));
 
       if (response.statusCode == 200) {
         var jsonData = jsonDecode(response.body);
